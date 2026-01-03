@@ -21,12 +21,10 @@ const verifyToken = async (req, res, next) => {
     if (!authorization) {
       return res.status(401).send({ message: "Unauthorized: No token found" });
     }
-
     const token = authorization.split(" ")[1];
     if (!token) {
       return res.status(401).send({ message: "Unauthorized: Invalid token" });
     }
-
     const decoded = await admin.auth().verifyIdToken(token);
     req.user = decoded;
     next();
@@ -55,17 +53,121 @@ async function run() {
 
     console.log("✅ Successfully connected to MongoDB!");
 
+    //================= user api ====================//
+    app.get("/users", async (req, res) => {
+      try {
+        const limit = parseInt(req.query.limit) || 50;
+        const users = await userCollection
+          .find({}, { projection: { password: 0 } })
+          .limit(limit)
+          .toArray();
+
+        res.status(200).send(users);
+      } catch (error) {
+        console.error("Get users error:", error);
+        res.status(500).send({ message: "Failed to fetch users" });
+      }
+    });
+
+    app.get("/users/:email", async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        if (!email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
+
+        const user = await userCollection.findOne({ email });
+
+        if (!user) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        res.send(user);
+      } catch (error) {
+        console.error("Get user error:", error);
+        res.status(500).send({ message: "Failed to fetch user" });
+      }
+    });
+
+    app.post("/users", async (req, res) => {
+      try {
+        const userData = req.body;
+
+        if (!userData?.email) {
+          return res.status(400).send({
+            success: false,
+            message: "Email is required",
+          });
+        }
+        const existingUser = await userCollection.findOne({
+          email: userData.email,
+        });
+        if (existingUser) {
+          await userCollection.updateOne(
+            { email: userData.email },
+            {
+              $set: {
+                lastLoginAt: new Date(),
+              },
+            }
+          );
+          return res.status(200).send({
+            success: true,
+            message: "User already exists, login date updated",
+          });
+        }
+        const newUser = {
+          ...userData,
+          role: "user",
+          createdAt: new Date(),
+        };
+        const result = await userCollection.insertOne(newUser);
+        res.status(201).send({
+          success: true,
+          message: "User created successfully",
+          insertedId: result.insertedId,
+        });
+      } catch (error) {
+        console.error("User create error:", error);
+        res.status(500).send({
+          success: false,
+          message: "Failed to create user",
+        });
+      }
+    });
+
     // ---------------- PRODUCTS ----------------
     app.get("/products", async (req, res) => {
+      const sort = req.query.sort;
+      let unitOrder = [];
+      if (sort === "bag") unitOrder = ["bag", "kg", "ton"];
+      else if (sort === "kg") unitOrder = ["kg", "bag", "ton"];
+      else if (sort === "ton") unitOrder = ["ton", "kg", "bag"];
       try {
-        const result = await productCollection.find().toArray();
+        const result = await productCollection
+          .aggregate([
+            {
+              $addFields: {
+                unitOrderIndex: {
+                  $indexOfArray: [unitOrder, "$unit"],
+                },
+              },
+            },
+            {
+              $sort: {
+                unitOrderIndex: 1,
+              },
+            },
+          ])
+          .toArray();
         res.send(result);
       } catch (error) {
         res.status(500).send({ message: "Failed to fetch products" });
       }
     });
 
-    app.get("/products/:id",  async (req, res) => {
+    app.get("/products/:id", async (req, res) => {
       try {
         const id = req.params.id;
         const result = await productCollection.findOne({
