@@ -56,9 +56,13 @@ async function run() {
     //================= user api ====================//
     app.get("/users", async (req, res) => {
       try {
+        const currentEmail = req.query.currentEmail;
         const limit = parseInt(req.query.limit) || 50;
+
+        const query = currentEmail ? { email: { $ne: currentEmail } } : {};
+
         const users = await userCollection
-          .find({}, { projection: { password: 0 } })
+          .find(query, { projection: { password: 0 } })
           .limit(limit)
           .toArray();
 
@@ -137,7 +141,66 @@ async function run() {
       }
     });
 
-    // ---------------- PRODUCTS ----------------
+    app.patch("/users/:id/role", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { role } = req.body;
+        if (!role || !["admin", "user"].includes(role)) {
+          return res
+            .status(400)
+            .send({ success: false, message: "Invalid role" });
+        }
+        const query = { _id: new ObjectId(id) };
+        const update = { $set: { role } };
+        const result = await userCollection.updateOne(query, update);
+
+        if (result.modifiedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "User not found or role already set",
+          });
+        }
+
+        res.send({ success: true, message: `Role updated to ${role}` });
+      } catch (error) {
+        console.error("Role update error:", error);
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to update role" });
+      }
+    });
+
+    app.delete("/users/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (!id) {
+          return res
+            .status(400)
+            .send({ success: false, message: "User ID is required" });
+        }
+        const query = { _id: new ObjectId(id) };
+        const result = await userCollection.deleteOne(query);
+
+        if (result.deletedCount === 0) {
+          return res
+            .status(404)
+            .send({ success: false, message: "User not found" });
+        }
+        res.status(200).send({
+          success: true,
+          message: "User deleted successfully",
+          deletedCount: result.deletedCount,
+        });
+      } catch (error) {
+        console.error("Delete user error:", error);
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to delete user" });
+      }
+    });
+
+    // ================ PRODUCTS ================//
     app.get("/products", async (req, res) => {
       const sort = req.query.sort;
       let unitOrder = [];
@@ -242,6 +305,13 @@ async function run() {
       } catch (error) {
         res.status(500).send({ message: "Failed to delete product" });
       }
+    });
+
+    //===========================//
+
+    app.get("/all-products", async (req, res) => {
+      const result = await productCollection.find().toArray();
+      res.send(result);
     });
 
     app.get("/my-posted", verifyToken, async (req, res) => {
