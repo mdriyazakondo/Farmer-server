@@ -73,7 +73,7 @@ async function run() {
       }
     });
 
-    app.get("/users/:email", verifyToken, async (req, res) => {
+    app.get("/users/:email",  async (req, res) => {
       try {
         const email = req.params.email;
 
@@ -201,7 +201,7 @@ async function run() {
     });
 
     // ================ PRODUCTS ================//
-    app.get("/products", verifyToken, async (req, res) => {
+    app.get("/products",  async (req, res) => {
       const sort = req.query.sort;
       let unitOrder = [];
       if (sort === "bag") unitOrder = ["bag", "kg", "ton"];
