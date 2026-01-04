@@ -54,7 +54,7 @@ async function run() {
     console.log("✅ Successfully connected to MongoDB!");
 
     //================= user api ====================//
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       try {
         const currentEmail = req.query.currentEmail;
         const limit = parseInt(req.query.limit) || 50;
@@ -73,7 +73,7 @@ async function run() {
       }
     });
 
-    app.get("/users/:email", async (req, res) => {
+    app.get("/users/:email", verifyToken, async (req, res) => {
       try {
         const email = req.params.email;
 
@@ -94,7 +94,7 @@ async function run() {
       }
     });
 
-    app.post("/users", async (req, res) => {
+    app.post("/users", verifyToken, async (req, res) => {
       try {
         const userData = req.body;
 
@@ -141,7 +141,7 @@ async function run() {
       }
     });
 
-    app.patch("/users/:id/role", async (req, res) => {
+    app.patch("/users/:id/role", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
         const { role } = req.body;
@@ -170,7 +170,7 @@ async function run() {
       }
     });
 
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, async (req, res) => {
       try {
         const id = req.params.id;
 
@@ -201,7 +201,7 @@ async function run() {
     });
 
     // ================ PRODUCTS ================//
-    app.get("/products", async (req, res) => {
+    app.get("/products", verifyToken, async (req, res) => {
       const sort = req.query.sort;
       let unitOrder = [];
       if (sort === "bag") unitOrder = ["bag", "kg", "ton"];
